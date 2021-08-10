@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Login
+{% endblock %}
+
+
+{% block body %}
+<div class="container mt-5">
+    {% for login in intro%}
+    <div class="alert alert-info">
+        Логин: {{ login.login }}
+        Пароль: {{ login.password }}
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
