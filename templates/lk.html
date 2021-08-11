@@ -6,7 +6,8 @@ Login
 
 
 {% block body %}
-<h1>user</h1>
+<h1>{{ current_user.name }}</h1>
+<a href="/new_quest" type="button" class="btn btn-primary">Новый опрос</a>
 <div class="container mt-5">
     {% for login in intro%}
     <div class="alert alert-info">
@@ -15,4 +16,5 @@ Login
     </div>
     {% endfor %}
 </div>
+
 {% endblock %}
