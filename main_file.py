@@ -1,5 +1,9 @@
-from flask import Flask, render_template, request, redirect, flash
+from flask import Flask, render_template, request, redirect, flash, url_for
 from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_login import LoginManager, login_required,UserMixin, login_user, current_user
+
 
 # создаем сервер и БД
 app = Flask(__name__)
@@ -7,35 +11,52 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///question_forms.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = 'adskhkjchxvyuneq1h4by372'
 db = SQLAlchemy(app)
+login_manager = LoginManager(app)
+login_manager.login_view = 'login'
 
 
 # Класс БД для пользователей
-class Users(db.Model):
-    user_id = db.Column(db.Integer, primary_key=True)
-    login = db.Column(db.String(30), nullable=False, unique=True)
-    password = db.Column(db.String(40), nullable=False)
-    name = db.Column(db.String(40), nullable=False)
+class User(db.Model, UserMixin):
+    __tablename__ = 'users'
+    id = db.Column(db.Integer(), primary_key=True)
+    name = db.Column(db.String(100))
+    login = db.Column(db.String(50), nullable=False, unique=True)
+    password_hash = db.Column(db.String(100), nullable=False)
+    created_on = db.Column(db.DateTime(), default=datetime.utcnow)
+    updated_on = db.Column(db.DateTime(), default=datetime.utcnow,  onupdate=datetime.utcnow)
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
 
     def __repr__(self):
-        return '<Users %r>' % self.user_id
+        return "<{}:{}>".format(self.id, self.username)
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    return db.session.query(User).get(user_id)
 
 
 # Страница входа, бэк
 @app.route('/login', methods=['POST', 'GET'])
 @app.route('/')
-def main():
+def login():
     if request.method == 'POST':
         login = request.form['login']
         password = request.form['password']
         try:
-            intro = Users.query.order_by(Users.login).all()
-            for el in intro:
-                if el.login == login and el.password == password:
-                    return render_template('lk.html', user=el.user_id)
-            flash('login or password not found', 'error')
-            return redirect('/login')
+            user = db.session.query(User).filter(User.login == login).first()
+            if user and user.check_password(password):
+                login_user(user)
+                load_user(user.id)
+                return redirect(url_for('lk'))
+            flash("Invalid username/password", 'error')
+            return redirect(url_for('login'))
         except Exception as e:
-            flash('Что-то пошло не так' + str(e), 'error')
+            flash('Что-то пошло не так ' + str(e), 'error')
             return redirect('/login')
     else:
         return render_template('login.html')
@@ -45,33 +66,32 @@ def main():
 @app.route('/registration', methods=['POST', 'GET'])
 def registration():
     if request.method == 'POST':
-        login = request.form['login']
-        password = request.form['password']
-        repeat_password = request.form['rep_psw']
         name = request.form['name']
-
-        user = Users(login=login, password=password, name=name)
-
-        if password == repeat_password:
+        login = request.form['login']
+        password = request.form['login']
+        password_check = request.form['rep_psw']
+        if password == password_check:
+            user = User(name=name, login=login)
+            user.set_password(password=password)
             try:
                 db.session.add(user)
                 db.session.commit()
-
-                return redirect('/')
-            except:
-                flash('exsisting login')
-                return redirect('/registration')
+                return redirect(url_for('login'))
+            except Exception as e:
+                flash("Error " + str(e), 'error')
+                return redirect(url_for('registration'))
         else:
-            flash("Password isn't match", 'error')
-            return redirect('/registration')
+            flash("Пароли не совпадают", 'error')
+            return redirect(url_for('registration'))
     else:
         return render_template('registration.html')
 
 
 # Личный кабинет
 @app.route('/lk')
+@login_required
 def lk():
-    intro = Users.query.order_by(Users.login).all()
+    intro = User.query.order_by(User.login).all()
     try:
         return render_template('lk.html', intro=intro)
     except Exception as e:

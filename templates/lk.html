@@ -6,11 +6,12 @@ Login
 
 
 {% block body %}
+<h1>user</h1>
 <div class="container mt-5">
     {% for login in intro%}
     <div class="alert alert-info">
         Логин: {{ login.login }}
-        Пароль: {{ login.password }}
+        Пароль: {{ login.password_hash }}
     </div>
     {% endfor %}
 </div>
